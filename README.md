@@ -1,36 +1,32 @@
 # cf_ai_security_guard
 
-A cybersecurity AI assistant built on Cloudflare's Agents platform. Ask it anything about vulnerabilities, network attacks, CTF challenges, secure coding, or breaking into cybersecurity — it explains everything from first principles.
+A stateful cybersecurity intelligence assistant built on Cloudflare's newest primitives.
 
-## Why this is different
+## Why this is useful 
 
-Most AI assistants answer security questions from training data alone — which has a cutoff date and can't know about vulnerabilities discovered last week. CyberGuard is different: when you ask about a specific CVE or vulnerable library, it fetches live data from the National Vulnerability Database in real time, then uses Cloudflare's edge network to cache that result globally so the next person who asks gets an instant response. It's not just a chatbot — it's a stateful security intelligence tool that gets smarter the more it's used, remembers your entire conversation history across sessions, and runs at the edge in hundreds of locations worldwide with no cold starts.
-
-Built using Cloudflare's newest primitives: the Agents SDK (open beta), Workers AI, Durable Objects for persistent memory, and Workers KV for edge caching — all deployed in a single Worker with no external infrastructure.
+Most AI assistants suffer from a knowledge cutoff, making them unreliable for discussing vulnerabilities discovered last week. I wanted to build an assistant that doesn't just guess from its weights: our agent fetches live data, caches it globally, and remembers everything.
 
 ## Live Demo
 
 https://security-guard.systemsobsidian.workers.dev
 
-## What it does
+## The Stack
 
-- Explains vulnerability classes (SQLi, XSS, buffer overflows, RCE, privilege escalation)
-- Walks through how network attacks work at a low level (SYN floods, ARP poisoning, MITM)
-- Gives CTF hints and methodology
-- Explains security tools (nmap, Burp Suite, Wireshark, Metasploit) from the ground up
-- Looks up real-time CVE vulnerability data and caches results at the edge via Workers KV
-- Remembers your entire conversation across sessions via Durable Objects
+- **Orchestration:** Cloudflare Agents SDK (`AIChatAgent`) handles message routing, streaming, and tool orchestration
+- **Inference:** Kimi K2.5 via Workers AI
+- **Persistent Memory:** Durable Objects with built-in SQL. This maintains a high-consistency record of every conversation across sessions
+- **Global Intelligence Cache:** Workers KV — CVE lookups are cached at the edge globally, *reducing redundant outbound API calls* and improving response times
+- **Zero-Infra Deployment:** The React frontend and entire agentic backend are bundled into a single Worker — no external databases, no containers, just V8 isolates
 
-## Architecture
+## Key Features
 
-- **LLM:** Kimi K2.5 via Cloudflare Workers AI
-- **State & Memory:** Durable Objects with built-in SQL — conversation history persists across sessions automatically
-- **Coordination:** Cloudflare Agents SDK (AIChatAgent) handles message routing, streaming, and tool orchestration
-- **Frontend:** React chat UI served directly from the Cloudflare Worker
-- **Edge Caching:** Workers KV caches CVE lookups globally, reducing latency and external API calls
-- **Tools:** CVE lookup with real-time data via cve.circl.lu, edge caching via Workers KV, weather, timezone, calculator, task scheduler
+- **Live CVE Intel:** When asked about a specific vulnerability, the agent triggers a real-time tool call to fetch live data from the National Vulnerability Database via `cve.circl.lu`
+- **First-Principles Explanations:** Explains complex topics — buffer overflows, SYN floods, ARP poisoning — by breaking down what is actually happening at the packet and memory level
+- **Persistent Investigation History:** Conversation state survives restarts and deploys via Durable Objects
+- **Edge Performance:** Runs across Cloudflare's global network with near-zero cold starts and localised execution
 
-## Running locally
+
+## Running Locally
 ```bash
 npm install
 npm run dev
