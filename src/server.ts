@@ -73,8 +73,17 @@ export class ChatAgent extends AIChatAgent<Env> {
       model: workersai("@cf/moonshotai/kimi-k2.5", {
         sessionAffinity: this.sessionAffinity
       }),
-      system: `You are a helpful assistant that can understand images. You can check the weather, get the user's timezone, run calculations, and schedule tasks. When users share images, describe what you see and answer questions about them.
+      system: `You are CyberGuard, an expert cybersecurity assistant with deep knowledge of offensive and defensive security. You help users understand:
 
+- Vulnerability classes (SQLi, XSS, buffer overflows, RCE, privilege escalation etc.)
+- CTF challenge hints and methodology (without giving full solutions unless asked)
+- Network protocols and how attacks like SYN floods, ARP poisoning, and MITM work at a low level
+- Secure coding practices and common mistakes
+- Tools like nmap, Burp Suite, Wireshark, Metasploit and how they work under the hood
+- CVEs and real-world exploits — explained technically and clearly
+- Career guidance for breaking into cybersecurity and red teaming
+
+You explain things from first principles. When someone asks why HTTPS uses port 443, you don't just say "that's the standard" — you explain the history, the RFC, and what a port actually is at the OS level.You are precise, technical, and never hand-wavy. When a user mentions a CVE ID or asks about vulnerabilities in a specific library or software, ALWAYS use the cveLookup tool to fetch real-time data before answering.
 ${getSchedulePrompt({ date: new Date() })}
 
 If the user asks to schedule a task, use the schedule tool to schedule the task.`,
@@ -87,6 +96,41 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         // MCP tools from connected servers
         ...mcpTools,
 
+        
+        cveLookup: tool({
+          description: "Look up real-time CVE vulnerability data by CVE ID or software name. ALWAYS use this when a user mentions a CVE ID or asks if a specific library or software is vulnerable. Do not rely on training data for CVE details.",
+          inputSchema: z.object({
+            query: z.string().describe("CVE ID (e.g. CVE-2021-44228) or software/library name")
+          }),
+          execute: async ({ query }) => {
+            const cacheKey = `cve:${query.toLowerCase()}`;
+
+            // Check KV cache first
+            const cached = await this.env.CVE_CACHE.get(cacheKey);
+            if (cached) {
+              return { source: "cache", data: JSON.parse(cached) };
+            }
+
+            // Fetch from live API
+            const url = query.toUpperCase().startsWith("CVE-")
+              ? `https://cve.circl.lu/api/cve/${query}`
+              : `https://cve.circl.lu/api/search/${encodeURIComponent(query)}/10`;
+
+            const response = await fetch(url);
+            if (!response.ok) {
+              return { error: `Could not find vulnerability data for: ${query}` };
+            }
+
+            const data = await response.json();
+
+            // Cache for 6 hours
+            await this.env.CVE_CACHE.put(cacheKey, JSON.stringify(data), {
+              expirationTtl: 21600
+            });
+
+            return { source: "live", data };
+          }
+        }),
         // Server-side tool: runs automatically on the server
         getWeather: tool({
           description: "Get the current weather for a city",
